@@ -77,7 +77,7 @@ else:
     old_bibIDs=np.zeros(1,str)
 
 print(old_bibIDs)
-bibcodes=[]
+bibcodes = set()
 looked_at_today=np.zeros(1,str)
 
 
@@ -109,12 +109,12 @@ for keyword in keywords:
             print('New RNAAS', x['author'][0],', ', x['bibcode'], ', ',x['title'][0], "https://iopscience.iop.org/article/"+x['doi'][0] )
             fout.write("New RNAAS, "+x['author'][0]+', '+x['bibcode']+ ', '+x['title'][0]+" ,"+ " https://iopscience.iop.org/article/"+x['doi'][0]+"\n" )
             slack_list.append("{author[0]:}, {bibcode[0]:}, <https://iopscience.iop.org/article/{doi[0]:}|{title[0]:}>".format(**x))
-        bibcodes.append(x['bibcode'])
+        bibcodes.add(x['bibcode'])
 
 
     looked_at_today=np.asarray(bibcodes, dtype=str)
 
-bibcodes=np.asarray(bibcodes, dtype=str)
+bibcodes=np.asarray(list(bibcodes), dtype=str)
 
 if len(slack_list) == 0:
     slack_message['blocks'].append(
@@ -127,21 +127,23 @@ if len(slack_list) == 0:
         }
     )
 else:
-    slack_message['blocks'].append(
-        {
-            "type": "section",
-            "text": {
-                "text": f"{len(slack_list)} new article{'' if len(slack_list) == 1 else 's'} found:",
-                "type": "mrkdwn"
+    slack_message['blocks'].extend(
+        [
+            {
+                "type": "section",
+                "text": {
+                    "text": f"{len(slack_list)} new article{'' if len(slack_list) == 1 else 's'} found:",
+                    "type": "mrkdwn"
+                },
             },
-        },
-        {
-            "type": "section",
-            "text": {
-                "text": "\n".join(slack_list),
-                "type": "mrkdwn"
+            {
+                "type": "section",
+                "text": {
+                    "text": "\n".join(slack_list),
+                    "type": "mrkdwn"
+                },
             },
-        }
+        ]
     )
 
 np.savetxt(oldIds_file, bibcodes, delimiter=',',fmt='%s',header='bibcodes_published')   # X is an array
