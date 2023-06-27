@@ -1,7 +1,13 @@
+"""
 
-# import the requests package and set your token in a variable for later use
+Required environment variables:
+  ADS_TOKEN (https://ui.adsabs.harvard.edu/user/settings/token)
+  SOLSYS_RNAAS_SLACK_POST_URL (https://api.slack.com/messaging/webhooks)
+
+"""
+
 import requests, os
-from urllib.parse import urlencode, quote_plus
+from urllib.parse import urlencode
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -14,7 +20,7 @@ ndays=90
 token=os.environ['ADS_TOKEN']
 outtxt="./newRNAAS.txt"
 
-# message designed with Slack's block kit builder
+slack_post_url = os.getenv("SOLSYS_RNAAS_SLACK_POST_URL")
 slack_message = {
     "blocks": [
         {
@@ -27,58 +33,21 @@ slack_message = {
     ]
 }
 
-"""
-        {
-            "type": "section",
-            "text": {
-                "text": "{n_images} image{plural_images} and {n_targets} target{plural_targets} processed in the past 24 hours.",
-                "type": "mrkdwn"
-            }
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "C/2022 E3   r=13.1 ± 0.03\n22P   g 11.14 ± 0.12"
-            }
-        }
-    ]
-}
-"""
 
-no_articles_message = {
-    "blocks": [
-        {
-            "type": "section",
-            "text": {
-                "text": f"*Solar System RNAAS daily summary*",
-                "type": "mrkdwn"
-            }
-        },
-        {
-            "type": "section",
-            "text": {
-                "text": f"No articles found in the past {ndays} days.",
-                "type": "mrkdwn"
-            }
-        },
-    ]
-}
+def quote_for_slack(s):
+    return s.replace("<", "&lt;").replace(">", "&gt;")
+
 
 fout=open(outtxt, 'w')
 
 #check if there a stored search
-old_bibIDs=[]
+old_bibcodes = set()
 
 if oldIds_file.is_file():
     print('reading in previous file of outputted bibIds')
-    old_bibIDs=np.genfromtxt(oldIds_file, dtype=str, skip_header=1)
-else:
-    old_bibIDs=np.zeros(1,str)
+    old_bibcodes = set(np.genfromtxt(oldIds_file, dtype=str, skip_header=1))
 
-print(old_bibIDs)
-bibcodes = set()
-looked_at_today=np.zeros(1,str)
+print(old_bibcodes)
 
 
 # get the current date and time
@@ -89,6 +58,7 @@ before=now- timedelta(days=ndays)
 print(before.month, before.year)
 
 slack_list = []
+bibcodes = set()
 for keyword in keywords:
     # search by bibstem, return the title
     print('searching '+keyword)
@@ -97,25 +67,26 @@ for keyword in keywords:
 
     query_results=results.json()
 
-
     for x in query_results['response']['docs']:
-        w= (x['bibcode'] == old_bibIDs)
-
-        wh= (x['bibcode'] == looked_at_today)
-
         print('Initial RNAAS match', x['author'][0],', ', x['bibcode'], ', ',x['title'][0], "https://iopscience.iop.org/article/"+x['doi'][0] )
 
-        if (len(old_bibIDs[w]) == 0) and (len(looked_at_today[wh]) ==0) :
+        if x['bibcode'] not in set.union(bibcodes, old_bibcodes):
             print('New RNAAS', x['author'][0],', ', x['bibcode'], ', ',x['title'][0], "https://iopscience.iop.org/article/"+x['doi'][0] )
             fout.write("New RNAAS, "+x['author'][0]+', '+x['bibcode']+ ', '+x['title'][0]+" ,"+ " https://iopscience.iop.org/article/"+x['doi'][0]+"\n" )
-            slack_list.append("{author[0]:}, {bibcode[0]:}, <https://iopscience.iop.org/article/{doi[0]:}|{title[0]:}>".format(**x))
+            slack_list.append(
+                "• {author[0]:}, {bibcode:}, <https://iopscience.iop.org/article/{doi[0]:}|{quoted_title:}>"
+                .format(
+                    quoted_title=quote_for_slack(x["title"][0]),
+                    **x
+                )
+            )
+
         bibcodes.add(x['bibcode'])
 
+np.savetxt(oldIds_file, list(bibcodes), delimiter=',',fmt='%s',header='bibcodes_published')   # X is an array
+fout.close()
 
-    looked_at_today=np.asarray(bibcodes, dtype=str)
-
-bibcodes=np.asarray(list(bibcodes), dtype=str)
-
+# format slack message and post
 if len(slack_list) == 0:
     slack_message['blocks'].append(
         {
@@ -132,7 +103,7 @@ else:
             {
                 "type": "section",
                 "text": {
-                    "text": f"{len(slack_list)} new article{'' if len(slack_list) == 1 else 's'} found:",
+                    "text": f"{len(slack_list)} new article{'' if len(slack_list) == 1 else 's'} found.",
                     "type": "mrkdwn"
                 },
             },
@@ -146,7 +117,8 @@ else:
         ]
     )
 
-np.savetxt(oldIds_file, bibcodes, delimiter=',',fmt='%s',header='bibcodes_published')   # X is an array
-fout.close()
-
-# post to slack
+r = requests.post(slack_post_url, data=json.dumps(slack_message))
+if r.status_code == 200:
+    print("Posted to Slack.")
+else:
+    print("Error posting to Slack.")
