@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import numpy as np
 
-keywords=['asteroid', "'main-belt comets'", "'centaur group'", 'centaurs', "'near-sun comets'", "'asteorid belt'", "'comet tails'",  'asteroids', 'Solar System', 'comet', 'comets', "'Small Solar System bodies'", 'comae', "'Kuiper belt'", "'Near-Earth objects'", "'Main belt asteroids'", "'asteroid surfaces'"]
+keywords=['asteroid', "'main-belt comets'", "'centaur group'", 'centaurs', "'near-sun comets'", "'asteroid belt'", "'comet tails'",  'asteroids', 'Solar System', 'comet', 'comets', "'Small Solar System bodies'", 'comae', "'Kuiper belt'", "'Near-Earth objects'", "'Main belt asteroids'", "'asteroid surfaces'"]
 
 oldIds_file = Path("./bibIDS.csv")
 ndays=90
