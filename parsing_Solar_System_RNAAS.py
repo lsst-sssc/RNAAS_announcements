@@ -117,8 +117,12 @@ else:
         ]
     )
 
-r = requests.post(slack_post_url, data=json.dumps(slack_message))
-if r.status_code == 200:
-    print("Posted to Slack.")
+if slack_post_url is None:
+    print("\nSOLSYS_RNAAS_SLACK_POST_URL is not defined, printing Slack message:\n")
+    print(json.dumps(slack_message, indent=2))
 else:
-    print("Error posting to Slack.")
+    r = requests.post(slack_post_url, data=json.dumps(slack_message))
+    if r.status_code == 200:
+        print("Posted to Slack.")
+    else:
+        print("Error posting to Slack.")
