@@ -1,4 +1,4 @@
-l# RNAAS_announcements
+# RNAAS_announcements
 Python script to check RNAAS for new relevant research notes
 
 The aim of the script is to use the ADS API to announce new relevant AAS Research Notes that hasve been recently published. 
