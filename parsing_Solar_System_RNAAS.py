@@ -1,7 +1,6 @@
 """
 
 Required environment variables:
-  ADS_TOKEN (https://ui.adsabs.harvard.edu/user/settings/token)
   SOLSYS_RNAAS_SLACK_POST_URL (https://api.slack.com/messaging/webhooks)
 
 """
@@ -9,16 +8,16 @@ Required environment variables:
 import requests, os
 from urllib.parse import urlencode
 import json
-from datetime import datetime, timedelta
+from astropy.time import Time
+from datetime import datetime, timezone
 from pathlib import Path
 import numpy as np
+import feedparser
 
-keywords=['asteroid', "'main-belt comets'", "'centaur group'", 'centaurs', "'near-sun comets'", "'asteroid belt'", "'comet tails'",  'asteroids', 'Solar System', 'comet', 'comets', "'short period comets'",  "'Small Solar System bodies'", 'comae', "'Kuiper belt'", "'Near-Earth objects'", "'Main belt asteroids'", "'asteroid surfaces'"]
+months={"January":1, "February":2, "March":3, "April":4, "May":5, "June":6, "July":7, "August":8, "September":9, "October":10, "November":11, "December":12  }
 
-oldIds_file = Path("./bibIDS.csv")
-ndays=90
-token=os.environ['ADS_TOKEN']
-outtxt="./newRNAAS.txt"
+url="https://iopscience.iop.org/journal/rss/2515-5172"
+
 
 slack_post_url = os.getenv("SOLSYS_RNAAS_SLACK_POST_URL")
 slack_message = {
@@ -26,65 +25,57 @@ slack_message = {
         {
             "type": "section",
             "text": {
-                "text": f"*Solar System RNAAS daily summary*",
+                "text": f"*Solar System, Exoplanets, and Astrobiology Corridor RNAAS daily summary*",
                 "type": "mrkdwn"
             }
         },
     ]
 }
 
-
-def quote_for_slack(s):
-    return s.replace("<", "&lt;").replace(">", "&gt;")
-
-
-fout=open(outtxt, 'w')
-
-#check if there a stored search
-old_bibcodes = set()
-
-if oldIds_file.is_file():
-    print('reading in previous file of outputted bibIds')
-    old_bibcodes = set(np.genfromtxt(oldIds_file, dtype=str, skip_header=1))
-
-print(old_bibcodes)
-
-
 # get the current date and time
-now = datetime.now()
-print(now.month, now.year)
 
-before=now- timedelta(days=ndays)
-print(before.month, before.year)
+ut_today = Time(datetime.now(tz=timezone.utc), scale='utc')
 
+feed = feedparser.parse(url)
+ 
 slack_list = []
-bibcodes = set()
-for keyword in keywords:
-    # search by bibstem, return the title
-    print('searching '+keyword)
-    encoded_query = urlencode({"q": "bibstem:RNAAS pubdate:["+str(before.year)+'-'+str(before.month)+" TO "+str(now.year)+'-'+str(now.month)+"] keyword:"+keyword, "fl": "author, title, bibcode, doi"})
-    results = requests.get("https://api.adsabs.harvard.edu/v1/search/query?{}".format(encoded_query),                        headers={'Authorization': 'Bearer ' + token})
+dois= set()
 
-    query_results=results.json()
 
-    for x in query_results['response']['docs']:
-        print('Initial RNAAS match', x['author'][0],', ', x['bibcode'], ', ',x['title'][0], "https://iopscience.iop.org/article/"+x['doi'][0] )
+for rss_item in feed.entries:
+    
+    if ( rss_item["aas_corridor"]  == 'The Solar System, Exoplanets, and Astrobiology'):
+        title =rss_item['title'] 
+        link=rss_item['link']
+        authors=rss_item['authors'][0]['name']
+        doi=rss_item["prism_doi"]
+        publication_date=rss_item["prism_coverdisplaydate"]
+        pdf_link=rss_item['iop_pdf'].replace("pdf", "ampdf")
+        #ampdf is what's needed on my browser to load the PDF
+        print(authors)
+        print(rss_item['dc_source'])
+    
+        
+        published_str=rss_item['prism_coverdisplaydate'][-4:]
+        
+        for i in months.keys():
+            if(rss_item['prism_coverdisplaydate'].find(i)>=0):
+               published_str=published_str+'-'+str(months[i])+'-'+rss_item['prism_coverdisplaydate'][0:2]
+            
+        
+       
+        print(published_str)
+        published= Time(published_str, format="iso", scale='utc')
 
-        if x['bibcode'] not in set.union(bibcodes, old_bibcodes):
-            print('New RNAAS', x['author'][0],', ', x['bibcode'], ', ',x['title'][0], "https://iopscience.iop.org/article/"+x['doi'][0] )
-            fout.write("New RNAAS, "+x['author'][0]+', '+x['bibcode']+ ', '+x['title'][0]+" ,"+ " https://iopscience.iop.org/article/"+x['doi'][0]+"\n" )
-            slack_list.append(
-                "• {author[0]:}, {bibcode:}, <https://iopscience.iop.org/article/{doi[0]:}|{quoted_title:}>"
-                .format(
-                    quoted_title=quote_for_slack(x["title"][0]),
-                    **x
-                )
-            )
+        dt=ut_today-published
+        
+     
+        if dt <=1:
 
-        bibcodes.add(x['bibcode'])
+            slack_title=f"<{link}|{title}>"
+            slack_pdf_link=f"<{pdf_link}|AAS-hosted PDF>"
+            slack_list.append(f"• {slack_title} {authors} {publication_date} {slack_pdf_link}")
 
-np.savetxt(oldIds_file, list(bibcodes), delimiter=',',fmt='%s',header='bibcodes_published')   # X is an array
-fout.close()
 
 # format slack message and post
 if len(slack_list) == 0:
@@ -116,6 +107,8 @@ else:
             },
         ]
     )
+
+
 
 if slack_post_url is None:
     print("\nSOLSYS_RNAAS_SLACK_POST_URL is not defined, printing Slack message:\n")
