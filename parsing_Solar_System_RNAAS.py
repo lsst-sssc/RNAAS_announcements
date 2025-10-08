@@ -34,7 +34,9 @@ slack_message = {
 
 # get the current date and time
 
-ut_today = Time(datetime.now(tz=timezone.utc), scale='utc')
+today = datetime.now(tz=timezone.utc)
+ut_today= Time(f"{today.year}-{today.month}-{today.day}", format="iso", scale='utc')
+
 
 feed = feedparser.parse(url)
  
@@ -67,14 +69,16 @@ for rss_item in feed.entries:
         print(published_str)
         published= Time(published_str, format="iso", scale='utc')
 
-        dt=ut_today-published
+        dt=ut_today.jd-published.jd
         
      
-        if dt <=1:
+        if dt <=2:
 
             slack_title=f"<{link}|{title}>"
             slack_pdf_link=f"<{pdf_link}|AAS-hosted PDF>"
             slack_list.append(f"• {slack_title} {authors} {publication_date} {slack_pdf_link}")
+           # print(f"• {slack_title} {authors} {publication_date} {slack_pdf_link}")
+            #print(dt)
 
 
 # format slack message and post
