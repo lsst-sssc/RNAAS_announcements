@@ -6,12 +6,9 @@ Required environment variables:
 """
 
 import requests, os
-from urllib.parse import urlencode
 import json
 from astropy.time import Time
 from datetime import datetime, timezone
-from pathlib import Path
-import numpy as np
 import feedparser
 
 months={"January":1, "February":2, "March":3, "April":4, "May":5, "June":6, "July":7, "August":8, "September":9, "October":10, "November":11, "December":12  }
@@ -25,7 +22,7 @@ slack_message = {
         {
             "type": "section",
             "text": {
-                "text": f"*Solar System, Exoplanets, and Astrobiology Corridor RNAAS daily summary*",
+                "text": "*Solar System, Exoplanets, and Astrobiology Corridor RNAAS daily summary*",
                 "type": "mrkdwn"
             }
         },
