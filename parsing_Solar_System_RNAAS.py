@@ -69,7 +69,7 @@ for rss_item in feed.entries:
         dt=ut_today.jd-published.jd
         
      
-        if dt <=2:
+        if dt <=1:
 
             slack_title=f"<{link}|{title}>"
             slack_pdf_link=f"<{pdf_link}|AAS-hosted PDF>"
